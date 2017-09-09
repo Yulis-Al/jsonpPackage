@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    <script>
+        var currentAddingScript;
+        var JSONP = (function() {
+            var _head = document.getElementsByTagName("head")[0];
+            var _baseElement = document.getElementsByTagName("base")[0];
+            var _helper = {
+                encodeURL: function(url) {
+                    var param = url.split("?")[1];
+                    var url = url.split("?")[0];
+                    var params = param.split("&");
+                    var parLen = params.length;
+
+                    for (var i = 0; i < parLen; i++) {
+                        var paItem = params[i].split("=");
+                        url += url.indexOf("?") >= 0 ? "&" : "?";
+                        url += encodeURIComponent(paItem[0]) + "=" + encodeURIComponent(paItem[1]);
+                    }
+                    return url;
+                },
+                addLoad: function(node, callback) {
+                    node.onload = node.readystatechange = function() {
+                        // Ensure only run once  in IE9
+                        node.onload = node.readystatechange = null;
+                        if (!this.readyState || node.readyState == "complete" || node.readyState == "loaded") {
+                            callback.call(this, JSONPData.getJsonData());
+                            this.parentNode.removeChild(this);
+                        }
+                    }
+                }
+            };
+            return {
+                start: function(url, func) {
+                    var encUrl = url;
+      
+                    //创建script结点
+                    var script = document.createElement("script");
+                    if (encUrl.indexOf("?") >= 0) {
+                        url = encUrl + "&callback=JSONP.callback";
+                        script.src = _helper.encodeURL(url);
+                    } else {
+                        url = encUrl + "?callback=JSONP.callback";
+                        script.src = _helper.encodeURL(url);
+                    }
+                    script.charset = "UTF-8";
+      
+                    //for ie6-9 关联script 和callback    
+                    var data = {};
+                    data[url] = func;
+                    JSONPData.save(data);
+                      
+                    //绑定加载完成事件
+                    _helper.addLoad(script, func);
+      
+                    // For some cache cases in IE 6-8, the script executes IMMEDIATELY after
+                    // the end of the insert execution, so use `currentlyAddingScript` to
+                    // hold current node,
+                    currentAddingScript = script;
+                    _baseElement ? _head.insertBefore(script, _baseElement) : _head.appendChild(script);    
+                },
+                
+                getInteractiveScript: function() {
+                    //ie6-9  获取正在执行的脚本
+
+                    if (currentAddingScript) {
+                        return currentAddingScript;
+                    }
+                    var scripts = document.getElementsByTagName('script');
+                    for (var i = 0; i < scripts.length; i++) {
+                        var script = scripts[i];
+                        if (script.readyState === 'interactive') {
+                            return script;
+                        }
+                    }
+                    return null;
+                },
+                callback: function(data) {
+
+                    // if ie6-9
+                    if (document.attachEvent) {
+                        var script = JSONP.getInteractiveScript();
+                        var callback = null;
+                        if (script) {
+                            callback = JSONPData.findCallback(script.src);
+                            if (typeof callback == "function") {
+                                callback(data);
+                            }
+                        } else {
+                            console.log("fail");
+                        }
+                    }
+                    // 设置返回的json数据,供调用
+                    JSONPData.setJsonData(data);
+                }
+            }
+        })();
+
+        var JSONPData = (function() {
+            var _dataStorage = [];
+            var _jsonData;
+
+            // 每个数据项是data {url: [callbackFunc]}
+            return {
+                save: function(data) {
+                    //检查data的url若相同，则回调函数不变
+                    for (var i in data) {
+                        if (!_dataStorage.hasOwnProperty(i)) {
+                            _dataStorage.push(data);
+                        }
+                    }
+                },
+                findCallback: function(url) {
+                    var len = _dataStorage.length;
+                    for (var i = 0; i < len; i++) {
+                        if (_dataStorage[i][url]) {
+                            return _dataStorage[i][url];
+                        }
+                    }
+                    return null;
+                },
+                setJsonData: function(data) {
+                    _jsonData = data ? data : null;
+                },
+                getJsonData: function() {
+                    return _jsonData;
+                }
+            }
+        })();
+    
+    </script>
+</body>
+</html>
